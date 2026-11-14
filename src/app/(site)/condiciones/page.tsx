@@ -3,6 +3,7 @@ import { SiteHeader } from '@/components/site-header'
 import { getSettings, orConsult } from '@/lib/settings'
 import { checkInText, checkOutText } from '@/lib/settings-format'
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Condiciones de reserva' }
 
 export default async function ConditionsPage() {
