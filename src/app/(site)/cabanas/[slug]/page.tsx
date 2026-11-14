@@ -6,9 +6,9 @@ import { BookingWidget } from '@/components/booking-widget'
 import { AmenityIcon } from '@/components/icons'
 import { Reveal } from '@/components/reveal'
 import { SiteHeader } from '@/components/site-header'
-import { getBusyRanges, getCabin } from '@/lib/data'
+import { getBusyRanges, getCabin, getRates } from '@/lib/data'
 import { addMonths, isISODate, todayInChile } from '@/lib/dates'
-import { site } from '@/lib/site'
+import { getSettings, orConsult } from '@/lib/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +25,11 @@ export default async function CabinPage(props: PageProps<'/cabanas/[slug]'>) {
   if (!cabin) notFound()
 
   const today = todayInChile()
-  const busy = await getBusyRanges(cabin.id, today, addMonths(today, 13))
+  const [busy, rates, settings] = await Promise.all([
+    getBusyRanges(cabin.id, today, addMonths(today, 13)),
+    getRates({ cabinId: cabin.id, from: today }),
+    getSettings(),
+  ])
   const llegada = typeof sp.llegada === 'string' && isISODate(sp.llegada) ? sp.llegada : undefined
   const salida = typeof sp.salida === 'string' && isISODate(sp.salida) ? sp.salida : undefined
   const huespedes = typeof sp.huespedes === 'string' ? Number(sp.huespedes) || undefined : undefined
@@ -65,7 +69,9 @@ export default async function CabinPage(props: PageProps<'/cabanas/[slug]'>) {
 
         <div className="mt-16">
           <BookingWidget
+            rates={rates}
             cabin={{
+              id: cabin.id,
               slug: cabin.slug,
               name: cabin.name,
               price_per_night: cabin.price_per_night,
@@ -104,14 +110,14 @@ export default async function CabinPage(props: PageProps<'/cabanas/[slug]'>) {
                 <h2 className="mb-5 font-display text-[42px] font-medium">Bueno saber</h2>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
                   {[
-                    ['Check-in', `Desde las ${site.checkInFrom}`],
-                    ['Check-out', `Hasta las ${site.checkOutUntil}`],
-                    ['Cancelación', site.cancellationPolicy],
-                    ['Mascotas', site.petsPolicy],
+                    ['Check-in', settings.check_in_from ? `Desde las ${settings.check_in_from}` : 'Consúltanos'],
+                    ['Check-out', settings.check_out_until ? `Hasta las ${settings.check_out_until}` : 'Consúltanos'],
+                    ['Cancelación', orConsult(settings.cancellation_policy)],
+                    ['Mascotas', orConsult(settings.pets_policy)],
                   ].map(([k, v]) => (
                     <div key={k} className="fx-tile rounded-[10px] bg-surface p-5">
                       <p className="text-xs uppercase tracking-[2px] text-muted">{k}</p>
-                      <p className="mt-2 text-lg font-semibold">{v}</p>
+                      <p className="mt-2 whitespace-pre-line text-lg font-semibold">{v}</p>
                     </div>
                   ))}
                 </div>

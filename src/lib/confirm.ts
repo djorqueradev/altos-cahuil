@@ -38,6 +38,8 @@ export async function processOrder(orderId: string): Promise<Booking | null> {
       status: 'confirmed',
       mp_order_id: order.id,
       mp_payment_id: paymentId,
+      amount_paid: paid,
+      payment_method: 'mercadopago',
       paid_at: new Date().toISOString(),
       expires_at: null,
       admin_alert: null,

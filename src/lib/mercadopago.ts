@@ -1,7 +1,6 @@
 import 'server-only'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { env } from '@/lib/env'
-import { site } from '@/lib/site'
 import type { Booking } from '@/lib/types'
 
 // Checkout Pro con la API de Orders de Mercado Pago.
@@ -40,7 +39,7 @@ export type MPOrder = {
 }
 
 /** Crea la order de Checkout Pro para una reserva pendiente y devuelve su checkout_url. */
-export async function createOrder(booking: Booking, cabinName: string): Promise<MPOrder> {
+export async function createOrder(booking: Booking, cabinName: string, holdMinutes = 30): Promise<MPOrder> {
   const siteUrl = env.siteUrl()
   const back = `${siteUrl}/reserva/${booking.id}`
   const isPublicUrl = siteUrl.startsWith('https://')
@@ -55,7 +54,7 @@ export async function createOrder(booking: Booking, cabinName: string): Promise<
       capture_mode: 'automatic', // resultado binario: aprobado o rechazado
       total_amount: amount,
       external_reference: booking.id,
-      expiration_time: `PT${site.paymentHoldMinutes}M`,
+      expiration_time: `PT${holdMinutes}M`,
       description: `Reserva ${booking.code} · ${cabinName}`,
       payer: {
         email: booking.guest_email,

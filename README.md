@@ -14,7 +14,7 @@ sincronización de calendarios con **Booking.com** y **Airbnb** (iCal) y panel d
 | Confirmación del pago (webhook) | `POST /api/mercadopago/webhook` |
 | Calendario que se exporta a Booking/Airbnb | `GET /api/ical/[cabaña]?token=…&exclude=booking` |
 | Importar Booking/Airbnb + liberar pagos vencidos | `GET /api/cron/sync` (con `Authorization: Bearer CRON_SECRET`) |
-| Panel (calendario, reservas, bloqueos, tarifas, canales) | `/admin` |
+| Panel: Hoy, calendario mensual, reservas, tarifas y temporadas, Booking/Airbnb, configuración | `/admin` |
 | Esquema de base de datos | `supabase/migrations/` |
 
 - Al reservar, las fechas quedan apartadas 30 min (`pending`) mientras el huésped paga. Una restricción de exclusión en Postgres
@@ -24,7 +24,7 @@ sincronización de calendarios con **Booking.com** y **Airbnb** (iCal) y panel d
 
 ## Puesta en marcha
 
-1. **Supabase**: en el SQL Editor ejecuta `supabase/migrations/20261114000000_init.sql`.
+1. **Supabase**: en el SQL Editor ejecuta, en orden, los archivos de `supabase/migrations/`.
 2. **Usuario administrador**: Authentication → Users → *Add user* (correo + contraseña). Luego en el SQL Editor:
    ```sql
    insert into public.admins (user_id) select id from auth.users where email = 'TU_CORREO';
@@ -44,6 +44,6 @@ sincronización de calendarios con **Booking.com** y **Airbnb** (iCal) y panel d
 4. **Booking/Airbnb**: en el panel → *Booking / Airbnb*, pega el enlace iCal que exporta cada canal y copia nuestro enlace
    en la opción *Importar calendario* de cada canal.
 
-## Textos por completar
+## Configuración del negocio
 
-Busca `[` en `src/lib/site.ts` (horarios, política de cancelación, mascotas, distancias) y en `src/app/(site)/condiciones`.
+Horarios, políticas, contacto, precios, temporadas y textos de cada cabaña se editan desde el panel (`/admin/configuracion` y `/admin/tarifas`).

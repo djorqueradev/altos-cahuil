@@ -1,5 +1,6 @@
 import 'server-only'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import type { Rate } from '@/lib/pricing'
 import type { BusyRange, Cabin, PublicCabin } from '@/lib/types'
 
 const PUBLIC_COLS =
@@ -49,4 +50,26 @@ export async function getBusyRanges(cabinId: string, from: string, to: string): 
 export async function isRangeFree(cabinId: string, checkIn: string, checkOut: string): Promise<boolean> {
   const busy = await getBusyRanges(cabinId, checkIn, checkOut)
   return busy.length === 0
+}
+
+
+/** Temporadas vigentes desde `from` (de una cabaña + las generales, o todas). */
+export async function getRates(opts: { cabinId?: string; from?: string } = {}): Promise<Rate[]> {
+  let q = supabaseAdmin()
+    .from('rates')
+    .select('id, cabin_id, label, start_date, end_date, price_per_night, min_nights')
+    .order('start_date')
+  if (opts.from) q = q.gt('end_date', opts.from)
+  if (opts.cabinId) q = q.or(`cabin_id.eq.${opts.cabinId},cabin_id.is.null`)
+  const { data, error } = await q
+  if (error) throw error
+  return (data ?? []) as Rate[]
+}
+
+export type DbQuote = { nights: number; subtotal: number; cleaning_fee: number; total: number; min_nights: number; has_unpriced: boolean }
+
+export async function getQuote(cabinId: string, checkIn: string, checkOut: string): Promise<DbQuote> {
+  const { data, error } = await supabaseAdmin().rpc('quote_stay', { p_cabin: cabinId, p_check_in: checkIn, p_check_out: checkOut })
+  if (error) throw error
+  return (Array.isArray(data) ? data[0] : data) as DbQuote
 }

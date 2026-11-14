@@ -3,6 +3,7 @@ import { env } from '@/lib/env'
 import { formatDateFull } from '@/lib/dates'
 import { formatCLP } from '@/lib/money'
 import { site } from '@/lib/site'
+import { getSettings, orConsult } from '@/lib/settings'
 import type { Booking } from '@/lib/types'
 
 /** Envía correos con Resend si RESEND_API_KEY está configurada. Si no, no hace nada. */
@@ -12,7 +13,7 @@ async function send(to: string | string[], subject: string, html: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: env.emailFrom(), to, subject, html, reply_to: site.email }),
+    body: JSON.stringify({ from: env.emailFrom(), to, subject, html, reply_to: (await getSettings()).contact_email }),
   })
   if (!res.ok) console.error('Resend error', res.status, await res.text())
 }
@@ -33,14 +34,15 @@ function bookingTable(b: Booking, cabinName: string) {
 }
 
 export async function sendBookingConfirmed(b: Booking, cabinName: string) {
+  const s = await getSettings()
   const guestHtml = `
   <div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#1A120A">
     <h1 style="font-family:Georgia,serif;font-weight:500;font-size:32px">¡Reserva confirmada!</h1>
     <p>Hola ${esc(b.guest_first_name)}, te esperamos en <strong>${site.name}</strong>.</p>
     ${bookingTable(b, cabinName)}
     <p style="margin-top:24px">Dirección: ${site.address}, ${site.locality}. ${site.directionsHint}</p>
-    <p>Check-in desde las ${site.checkInFrom} · Check-out hasta las ${site.checkOutUntil}.</p>
-    <p>Antes de tu llegada te escribiremos por WhatsApp con las indicaciones. Cualquier duda: ${site.phone} · ${site.email}</p>
+    <p>Check-in desde las ${orConsult(s.check_in_from)} · Check-out hasta las ${orConsult(s.check_out_until)}.</p>
+    <p>Antes de tu llegada te escribiremos por WhatsApp con las indicaciones. Cualquier duda: ${s.contact_phone} · ${s.contact_email}</p>
   </div>`
   await send(b.guest_email, `Reserva ${b.code} confirmada · ${site.name}`, guestHtml)
 

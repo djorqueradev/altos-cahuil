@@ -16,8 +16,10 @@ import {
   type Range,
 } from '@/lib/dates'
 import { formatCLP } from '@/lib/money'
+import { nightPrice, quote, type Rate } from '@/lib/pricing'
 
 type CabinInfo = {
+  id: string
   slug: string
   name: string
   price_per_night: number
@@ -30,6 +32,7 @@ type Props = {
   cabin: CabinInfo
   today: string
   busy: Range[]
+  rates?: Rate[]
   initialCheckIn?: string
   initialCheckOut?: string
   initialGuests?: number
@@ -45,7 +48,7 @@ function rangeFree(from: string, to: string, busy: Range[]) {
   return true
 }
 
-export function BookingWidget({ cabin, today, busy, initialCheckIn, initialCheckOut, initialGuests, before, after }: Props) {
+export function BookingWidget({ cabin, today, busy, rates = [], initialCheckIn, initialCheckOut, initialGuests, before, after }: Props) {
   const validInitial =
     initialCheckIn &&
     initialCheckOut &&
@@ -65,9 +68,11 @@ export function BookingWidget({ cabin, today, busy, initialCheckIn, initialCheck
   )
 
   const nights = checkIn && checkOut ? diffDays(checkIn, checkOut) : 0
-  const subtotal = nights * cabin.price_per_night
-  const total = nights ? subtotal + cabin.cleaning_fee : 0
-  const priceSet = cabin.price_per_night > 0
+  const q = checkIn && checkOut ? quote(cabin, checkIn, checkOut, rates) : null
+  const subtotal = q?.subtotal ?? 0
+  const total = q?.total ?? 0
+  const priceSet = q ? !q.unpriced : cabin.price_per_night > 0 || rates.length > 0
+  const fromPrice = Math.min(...[cabin.price_per_night, ...rates.map((r) => r.price_per_night)].filter((p) => p > 0))
 
   const months = useMemo(() => {
     const first = addMonths(today, offset)
@@ -96,8 +101,9 @@ export function BookingWidget({ cabin, today, busy, initialCheckIn, initialCheck
       setMessage('Hay noches ocupadas entre esas fechas. Empecemos de nuevo desde aquí.')
       return
     }
-    if (diffDays(checkIn, d) < cabin.min_nights) {
-      setMessage(`La estadía mínima es de ${cabin.min_nights} noches.`)
+    const minN = quote(cabin, checkIn, d, rates).minNights
+    if (diffDays(checkIn, d) < minN) {
+      setMessage(`Para esas fechas la estadía mínima es de ${minN} noches.`)
       return
     }
     setCheckOut(d)
@@ -207,7 +213,8 @@ export function BookingWidget({ cabin, today, busy, initialCheckIn, initialCheck
         <div className="hidden md:block">
           {priceSet ? (
             <p className="text-[15px] text-sub">
-              <strong className="font-display text-[40px] font-semibold text-cream">{formatCLP(cabin.price_per_night)}</strong> / noche
+              {fromPrice !== cabin.price_per_night && 'desde '}
+              <strong className="font-display text-[40px] font-semibold text-cream">{formatCLP(Number.isFinite(fromPrice) ? fromPrice : cabin.price_per_night)}</strong> / noche
             </p>
           ) : (
             <p className="text-[15px] text-sub">Precio por confirmar</p>
@@ -256,7 +263,13 @@ export function BookingWidget({ cabin, today, busy, initialCheckIn, initialCheck
 
         {nights > 0 && priceSet && (
           <div className="fx-up mt-5 hidden flex-col gap-2.5 text-[15px] text-sub md:flex">
-            <div className="flex justify-between"><span>{formatCLP(cabin.price_per_night)} × {nights} {nights === 1 ? 'noche' : 'noches'}</span><span>{formatCLP(subtotal)}</span></div>
+            <div className="flex justify-between">
+              <span>
+                {nights} {nights === 1 ? 'noche' : 'noches'}
+                {checkIn && subtotal !== nightPrice(cabin, checkIn, rates) * nights ? ' (precio según temporada)' : ` × ${formatCLP(nightPrice(cabin, checkIn!, rates))}`}
+              </span>
+              <span>{formatCLP(subtotal)}</span>
+            </div>
             {cabin.cleaning_fee > 0 && (
               <div className="flex justify-between"><span>Limpieza</span><span>{formatCLP(cabin.cleaning_fee)}</span></div>
             )}

@@ -1,21 +1,25 @@
+import type { Metadata } from 'next'
 import { getAllCabinsAdmin } from '@/lib/data'
 import { env } from '@/lib/env'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { saveFeed, syncNow } from '../../actions'
-import { Flash, btn, card, ghost, inputCls, labelCls } from '../flash'
+import { saveFeedAction } from '../../actions'
+import { CopyField } from '../../_components/copy-field'
+import { Flash } from '../../_components/flash'
+import { Badge, Card, PageHeader, cls } from '../../_components/ui'
 
 export const dynamic = 'force-dynamic'
+export const metadata: Metadata = { title: 'Booking y Airbnb' }
 
 const CHANNELS = [
   {
     id: 'booking',
     name: 'Booking.com',
-    how: 'Extranet → Tarifas y disponibilidad → Sincronizar calendarios → Exportar calendario (copia el enlace) / Importar calendario (pega el nuestro).',
+    how: 'Extranet → Tarifas y disponibilidad → Sincronizar calendarios.',
   },
   {
     id: 'airbnb',
     name: 'Airbnb',
-    how: 'Anuncio → Disponibilidad → Conectar calendarios → Exportar calendario (copia el enlace) / Importar calendario (pega el nuestro).',
+    how: 'Anuncio → Disponibilidad → Sincronización de calendarios / Conectar calendarios.',
   },
 ] as const
 
@@ -26,61 +30,64 @@ export default async function ChannelsPage(props: PageProps<'/admin/canales'>) {
   const site = env.siteUrl()
 
   return (
-    <div className="fx-up flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-[40px] font-medium leading-none">Booking y Airbnb</h1>
-          <p className="mt-2 max-w-[720px] text-sm text-sub">
-            Conecta los calendarios en las dos direcciones: pega aquí el enlace que te da cada canal, y pega en cada canal el enlace
-            nuestro. Así una reserva en cualquier lado bloquea las fechas en los demás.
-          </p>
-        </div>
-        <form action={syncNow}>
-          <input type="hidden" name="redirectTo" value="/admin/canales" />
-          <button type="submit" className={ghost}>Sincronizar ahora</button>
-        </form>
-      </div>
+    <>
+      <PageHeader
+        title="Booking y Airbnb"
+        subtitle="Conecta los calendarios en las dos direcciones para que una reserva en cualquier lado bloquee las fechas en los demás."
+      />
       <Flash sp={sp} />
 
-      {cabins.map((c) => (
-        <section key={c.id} className={`${card} flex flex-col gap-6 p-6`}>
-          <h2 className="font-display text-[30px] font-semibold">{c.name}</h2>
-          {CHANNELS.map((ch) => {
-            const feed = (feeds ?? []).find((f) => f.cabin_id === c.id && f.channel === ch.id)
-            const exportUrl = `${site}/api/ical/${c.slug}?token=${c.ical_export_token}&exclude=${ch.id}`
-            const ok = feed?.last_status === 'ok'
-            return (
-              <div key={ch.id} className="flex flex-col gap-4 rounded-xl bg-ink p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="font-semibold">{ch.name}</p>
-                  {feed ? (
-                    <span className={`flex items-center gap-2 text-[13px] font-semibold ${ok ? 'text-[#A7E3BC]' : 'text-amber-light'}`}>
-                      <span aria-hidden="true" className={`h-2 w-2 rounded-full ${ok ? 'bg-[#4ADE80]' : 'bg-amber'}`} />
-                      {ok ? `Conectado · ${feed.last_event_count ?? 0} reservas` : feed.last_status ?? 'Sin sincronizar'}
-                    </span>
-                  ) : (
-                    <span className="text-[13px] text-muted">Sin conectar</span>
-                  )}
-                </div>
-                <p className="text-xs leading-relaxed text-muted">{ch.how}</p>
-                <form action={saveFeed} className="flex flex-wrap items-end gap-3">
-                  <input type="hidden" name="cabin_id" value={c.id} />
-                  <input type="hidden" name="channel" value={ch.id} />
-                  <label className={`${labelCls} min-w-0 flex-[1_1_380px]`}>
-                    1 · Enlace iCal que exporta {ch.name}
-                    <input name="ical_url" type="url" defaultValue={feed?.ical_url ?? ''} placeholder="https://…" className={inputCls} />
-                  </label>
-                  <button type="submit" className={btn}>Guardar</button>
-                </form>
-                <label className={labelCls}>
-                  2 · Pega este enlace en “Importar calendario” de {ch.name}
-                  <input readOnly value={exportUrl} className={`${inputCls} font-mono text-xs`} />
-                </label>
-              </div>
-            )
-          })}
-        </section>
-      ))}
-    </div>
+      <div className="mb-5 rounded-2xl border border-cream/[0.06] bg-surface p-5 text-sm leading-relaxed text-sub">
+        <p className="mb-2 font-semibold text-cream">Cómo se conecta (una vez por cabaña y por canal):</p>
+        <ol className="list-decimal space-y-1 pl-5">
+          <li>En Booking/Airbnb, <strong className="text-cream">exporta</strong> el calendario y pega ese enlace en el paso 1.</li>
+          <li>Copia nuestro enlace del paso 2 y pégalo en la opción <strong className="text-cream">importar calendario</strong> de Booking/Airbnb.</li>
+        </ol>
+        <p className="mt-2 text-xs text-muted">Booking y Airbnb leen nuestro calendario cada cierto tiempo (normalmente entre 30 minutos y unas horas). Nosotros leemos los suyos antes de cada reserva web y periódicamente.</p>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {cabins.map((c) => (
+          <Card key={c.id} title={c.name}>
+            <div className="grid gap-4 lg:grid-cols-2">
+              {CHANNELS.map((ch) => {
+                const feed = (feeds ?? []).find((f) => f.cabin_id === c.id && f.channel === ch.id)
+                const exportUrl = `${site}/api/ical/${c.slug}?token=${c.ical_export_token}&exclude=${ch.id}`
+                const ok = feed?.last_status === 'ok'
+                return (
+                  <div key={ch.id} className="flex flex-col gap-4 rounded-xl bg-ink p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold">{ch.name}</p>
+                      {feed ? (
+                        ok ? <Badge tone="green">Conectado · {feed.last_event_count ?? 0} reservas</Badge> : <Badge tone="red">Error al leer</Badge>
+                      ) : (
+                        <Badge tone="gray">Sin conectar</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted">{ch.how}</p>
+                    {feed && !ok && feed.last_status && <p className="text-xs text-[#F4B4AC]">{feed.last_status}</p>}
+                    <form action={saveFeedAction} className="flex flex-col gap-2">
+                      <input type="hidden" name="cabin_id" value={c.id} />
+                      <input type="hidden" name="channel" value={ch.id} />
+                      <label className={cls.label}>
+                        1 · Enlace que exporta {ch.name}
+                        <input name="ical_url" type="url" defaultValue={feed?.ical_url ?? ''} placeholder="https://…" className={cls.input} />
+                      </label>
+                      <button type="submit" className={`${cls.btnSm} self-start`}>{feed ? 'Guardar y sincronizar' : 'Conectar'}</button>
+                    </form>
+                    <CopyField label={`2 · Pega este enlace en ${ch.name} (importar calendario)`} value={exportUrl} />
+                    {feed?.last_synced_at && (
+                      <p className="text-xs text-muted">
+                        Última lectura: {new Date(feed.last_synced_at).toLocaleString('es-CL', { timeZone: 'America/Santiago', dateStyle: 'short', timeStyle: 'short' })}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </>
   )
 }

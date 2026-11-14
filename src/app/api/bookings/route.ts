@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getCabin } from '@/lib/data'
 import { isISODate } from '@/lib/dates'
 import { createOrder } from '@/lib/mercadopago'
-import { site } from '@/lib/site'
+import { getSettings } from '@/lib/settings'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { syncChannels } from '@/lib/sync'
 import type { Booking } from '@/lib/types'
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     p_document: b.document ?? '',
     p_arrival_window: b.arrivalWindow ?? '',
     p_notes: b.notes ?? '',
-    p_hold_minutes: site.paymentHoldMinutes,
+    p_hold_minutes: 30,
   })
   if (error) {
     return NextResponse.json({ error: friendly(error.message) }, { status: error.message.startsWith('NOT_AVAILABLE') ? 409 : 400 })
@@ -71,7 +71,8 @@ export async function POST(req: Request) {
   const booking = data as Booking
 
   try {
-    const order = await createOrder(booking, cabin.name)
+    const settings = await getSettings()
+    const order = await createOrder(booking, cabin.name, settings.payment_hold_minutes)
     if (!order.checkout_url) throw new Error('Mercado Pago no devolvió checkout_url')
     await db.from('bookings').update({ mp_order_id: order.id }).eq('id', booking.id)
     return NextResponse.json({ bookingId: booking.id, checkoutUrl: order.checkout_url })

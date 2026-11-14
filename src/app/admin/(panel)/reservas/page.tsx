@@ -1,148 +1,79 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
-import { DateField } from '@/components/date-picker'
 import { getAllCabinsAdmin } from '@/lib/data'
-import { formatDateShort, todayInChile } from '@/lib/dates'
-import { formatCLP } from '@/lib/money'
+import { todayInChile } from '@/lib/dates'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import type { Booking } from '@/lib/types'
-import { cancelBooking, clearAlert, createManualBooking } from '../../actions'
-import { ConfirmSubmit } from '../confirm-submit'
-import { Flash, btn, card, ghost, inputCls, labelCls } from '../flash'
+import { BookingsTable } from '../../_components/bookings-table'
+import { QuickActions } from '../../_components/clickable'
+import { PageHeader } from '../../_components/ui'
+import { toAdminBooking } from '../../_lib/queries'
 
 export const dynamic = 'force-dynamic'
-
-const STATUS: Record<string, [string, string]> = {
-  confirmed: ['Confirmada', 'bg-[#1F3A2A] text-[#A7E3BC]'],
-  pending: ['Esperando pago', 'bg-amber/15 text-amber-light'],
-  cancelled: ['Cancelada', 'bg-surface-2 text-muted'],
-  expired: ['No pagó', 'bg-surface-2 text-muted'],
-}
+export const metadata: Metadata = { title: 'Reservas' }
 
 const FILTERS = [
-  { id: 'proximas', label: 'Próximas' },
+  { id: 'proximas', label: 'Próximas y en curso' },
+  { id: 'cobrar', label: 'Por cobrar' },
   { id: 'pasadas', label: 'Pasadas' },
-  { id: 'todas', label: 'Todas' },
+  { id: 'canceladas', label: 'Canceladas / no pagadas' },
   { id: 'alertas', label: 'Con alertas' },
+  { id: 'todas', label: 'Todas' },
 ]
 
 export default async function ReservationsPage(props: PageProps<'/admin/reservas'>) {
   const sp = await props.searchParams
-  const filtro = typeof sp.filtro === 'string' ? sp.filtro : 'proximas'
+  const filtro = typeof sp.filtro === 'string' && FILTERS.some((f) => f.id === sp.filtro) ? sp.filtro : 'proximas'
+  const cabana = typeof sp.cabana === 'string' ? sp.cabana : ''
   const today = todayInChile()
   const cabins = await getAllCabinsAdmin()
-  const cabinName = Object.fromEntries(cabins.map((c) => [c.id, c.name]))
 
-  let q = supabaseAdmin().from('bookings').select('*').limit(200)
+  let q = supabaseAdmin().from('bookings').select('*, cabins(name)').limit(500)
+  if (cabana) {
+    const c = cabins.find((x) => x.slug === cabana)
+    if (c) q = q.eq('cabin_id', c.id)
+  }
   if (filtro === 'proximas') q = q.gte('check_out', today).in('status', ['confirmed', 'pending']).order('check_in')
+  else if (filtro === 'cobrar') q = q.eq('status', 'confirmed').order('check_in')
   else if (filtro === 'pasadas') q = q.lt('check_out', today).eq('status', 'confirmed').order('check_in', { ascending: false })
+  else if (filtro === 'canceladas') q = q.in('status', ['cancelled', 'expired']).order('created_at', { ascending: false })
   else if (filtro === 'alertas') q = q.not('admin_alert', 'is', null).order('created_at', { ascending: false })
-  else q = q.order('created_at', { ascending: false })
+  else q = q.order('check_in', { ascending: false })
   const { data } = await q
-  const rows = (data ?? []) as Booking[]
+  let rows = ((data ?? []) as (Booking & { cabins: { name: string } | null })[]).map(toAdminBooking)
+  if (filtro === 'cobrar') rows = rows.filter((b) => b.amount_paid < b.total)
+
+  const href = (f: string, c: string) => `/admin/reservas?${new URLSearchParams({ filtro: f, ...(c ? { cabana: c } : {}) })}`
 
   return (
-    <div className="fx-up flex flex-col gap-6">
-      <h1 className="font-display text-[40px] font-medium leading-none">Reservas</h1>
-      <Flash sp={sp} />
-
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <Link
-            key={f.id}
-            href={`/admin/reservas?filtro=${f.id}`}
-            className={`${ghost} flex items-center ${filtro === f.id ? 'border-amber bg-amber/10 text-amber-light' : ''}`}
-          >
-            {f.label}
-          </Link>
-        ))}
+    <>
+      <PageHeader title="Reservas" subtitle="Toca una reserva para ver el detalle, cobrar, escribir por WhatsApp o cancelar." actions={<QuickActions />} />
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {FILTERS.map((f) => (
+            <Link
+              key={f.id}
+              href={href(f.id, cabana)}
+              className={`flex min-h-9 shrink-0 items-center rounded-full border px-3.5 text-[13px] font-semibold ${filtro === f.id ? 'border-amber bg-amber/15 text-amber-light' : 'border-cream/15 text-sub hover:text-cream'}`}
+            >
+              {f.label}
+            </Link>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {[{ slug: '', name: 'Todas las cabañas' }, ...cabins].map((c) => (
+            <Link
+              key={c.slug || 'all'}
+              href={href(filtro, c.slug)}
+              className={`flex min-h-8 items-center rounded-full px-3 text-xs font-semibold ${cabana === c.slug ? 'bg-surface-2 text-cream' : 'text-muted hover:text-cream'}`}
+            >
+              {c.name}
+            </Link>
+          ))}
+        </div>
       </div>
-
-      <div className={`${card} overflow-x-auto`}>
-        <table className="w-full min-w-[900px] border-collapse text-sm">
-          <thead>
-            <tr className="text-left text-[11px] uppercase tracking-[1.5px] text-muted">
-              {['Código', 'Huésped', 'Cabaña', 'Fechas', 'Total', 'Estado', ''].map((h) => (
-                <th key={h} className="px-5 py-3.5 font-semibold">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr><td colSpan={7} className="px-5 py-10 text-center text-muted">No hay reservas en esta vista.</td></tr>
-            )}
-            {rows.map((b) => {
-              const [label, cls] = STATUS[b.status]
-              return (
-                <tr key={b.id} className="fx-row border-t border-line align-top">
-                  <td className="px-5 py-4">
-                    <span className="font-semibold text-amber">{b.code}</span>
-                    <span className="block text-xs text-muted">{b.source === 'manual' ? 'Manual' : 'Web'}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className="font-semibold">{b.guest_first_name} {b.guest_last_name}</span>
-                    <span className="block text-xs text-muted">{b.guests} pers. · {b.guest_phone}</span>
-                    <span className="block text-xs text-muted">{b.guest_email}</span>
-                    {b.notes && <span className="mt-1 block max-w-[260px] text-xs text-sub">“{b.notes}”</span>}
-                  </td>
-                  <td className="px-5 py-4">{cabinName[b.cabin_id]}</td>
-                  <td className="px-5 py-4">
-                    {formatDateShort(b.check_in)} → {formatDateShort(b.check_out)}
-                    <span className="block text-xs text-muted">{b.nights} noches{b.arrival_window ? ` · ${b.arrival_window}` : ''}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    {formatCLP(b.total)}
-                    {b.mp_payment_id && <span className="block text-xs text-muted">MP #{b.mp_payment_id}</span>}
-                  </td>
-                  <td className="px-5 py-4">
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{label}</span>
-                    {b.admin_alert && <span className="mt-2 block max-w-[240px] text-xs text-amber-light">⚠ {b.admin_alert}</span>}
-                  </td>
-                  <td className="px-5 py-4">
-                    <div className="flex flex-col items-start gap-2">
-                      {b.admin_alert && (
-                        <form action={clearAlert}>
-                          <input type="hidden" name="id" value={b.id} />
-                          <button type="submit" className={ghost}>Marcar resuelta</button>
-                        </form>
-                      )}
-                      {(b.status === 'confirmed' || b.status === 'pending') && (
-                        <form action={cancelBooking}>
-                          <input type="hidden" name="id" value={b.id} />
-                          <ConfirmSubmit message={`¿Cancelar la reserva ${b.code}? Las fechas quedarán libres.`} className={ghost}>
-                            Cancelar
-                          </ConfirmSubmit>
-                        </form>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <section id="nueva" className={`${card} scroll-mt-8 p-6`}>
-        <h2 className="text-lg font-bold">Nueva reserva manual</h2>
-        <p className="mt-1 text-sm text-muted">Para reservas por teléfono, WhatsApp o transferencia. Queda confirmada y bloquea las fechas en todos los canales.</p>
-        <form action={createManualBooking} className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
-          <label className={labelCls}>Cabaña
-            <select name="cabin_id" required className={inputCls}>
-              {cabins.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-          <div className={labelCls}><span aria-hidden="true">Llegada</span><DateField aria-label="Llegada" name="check_in" min={today} className={`${inputCls} flex w-full items-center`} /></div>
-          <div className={labelCls}><span aria-hidden="true">Salida</span><DateField aria-label="Salida" name="check_out" min={today} className={`${inputCls} flex w-full items-center`} /></div>
-          <label className={labelCls}>Huéspedes<input type="number" name="guests" min={1} max={20} defaultValue={2} required className={inputCls} /></label>
-          <label className={labelCls}>Nombre<input name="guest_first_name" required className={inputCls} /></label>
-          <label className={labelCls}>Apellido<input name="guest_last_name" className={inputCls} /></label>
-          <label className={labelCls}>Teléfono<input name="guest_phone" className={inputCls} /></label>
-          <label className={labelCls}>Correo<input type="email" name="guest_email" className={inputCls} /></label>
-          <label className={labelCls}>Total cobrado (CLP)<input name="total" inputMode="numeric" defaultValue="0" className={inputCls} /></label>
-          <label className={`${labelCls} md:col-span-2`}>Notas<input name="notes" className={inputCls} /></label>
-          <div className="flex items-end"><button type="submit" className={btn}>Crear reserva</button></div>
-        </form>
-      </section>
-    </div>
+      <BookingsTable bookings={rows} />
+      <p className="mt-4 text-xs text-muted">Las reservas de Booking y Airbnb se ven en el calendario; sus datos y pagos se gestionan en cada plataforma.</p>
+    </>
   )
 }

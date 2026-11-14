@@ -50,6 +50,9 @@ export type Booking = {
   mp_payment_id: string | null
   paid_at: string | null
   admin_alert: string | null
+  amount_paid: number
+  payment_method: string | null
+  internal_notes: string | null
   created_at: string
 }
 

@@ -5,7 +5,7 @@ import { CabinPrice } from '@/components/cabin-price'
 import { Reveal } from '@/components/reveal'
 import { SearchBar } from '@/components/search-bar'
 import { SiteHeader } from '@/components/site-header'
-import { getCabins, isRangeFree } from '@/lib/data'
+import { getCabins, getQuote, isRangeFree } from '@/lib/data'
 import { diffDays, formatDate, isISODate, todayInChile } from '@/lib/dates'
 import { formatCLP } from '@/lib/money'
 
@@ -27,6 +27,7 @@ export default async function CabinsPage(props: PageProps<'/cabanas'>) {
       cabin: c,
       fits: huespedes <= c.capacity,
       free: hasDates ? await isRangeFree(c.id, llegada!, salida!) : true,
+      quote: hasDates ? await getQuote(c.id, llegada!, salida!) : null,
     })),
   )
   const qs = (slug: string) =>
@@ -52,8 +53,8 @@ export default async function CabinsPage(props: PageProps<'/cabanas'>) {
         />
 
         <div className="mt-14 grid grid-cols-[repeat(auto-fit,minmax(min(100%,460px),1fr))] gap-8">
-          {results.map(({ cabin: c, free, fits }, i) => {
-            const ok = free && fits
+          {results.map(({ cabin: c, free, fits, quote }, i) => {
+            const ok = free && fits && (!quote || quote.nights >= quote.min_nights)
             return (
               <Reveal key={c.id} delay={i * 120}>
                 <Link href={qs(c.slug)} className="fx-card flex h-full flex-col overflow-hidden rounded-[10px] bg-surface">
@@ -63,16 +64,16 @@ export default async function CabinsPage(props: PageProps<'/cabanas'>) {
                       <span
                         className={`absolute left-4 top-4 rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[1.5px] ${ok ? 'bg-amber text-amber-ink' : 'bg-ink/80 text-sand'}`}
                       >
-                        {ok ? 'Disponible' : !fits ? `Máx. ${c.capacity} personas` : 'No disponible'}
+                        {ok ? 'Disponible' : !fits ? `Máx. ${c.capacity} personas` : free && quote ? `Mínimo ${quote.min_nights} noches` : 'No disponible'}
                       </span>
                     )}
                   </div>
                   <div className="flex flex-col gap-3 p-7">
                     <div className="flex flex-wrap items-baseline justify-between gap-4">
                       <h2 className="font-display text-[36px] font-semibold">{c.name}</h2>
-                      {hasDates && ok && c.price_per_night > 0 ? (
+                      {hasDates && ok && quote && !quote.has_unpriced ? (
                         <span className="text-[15px] text-sub">
-                          <strong className="text-[22px] text-cream">{formatCLP(c.price_per_night * nights + c.cleaning_fee)}</strong> total
+                          <strong className="text-[22px] text-cream">{formatCLP(quote.total)}</strong> total
                         </span>
                       ) : (
                         <CabinPrice price={c.price_per_night} className="text-[15px] text-sub" />

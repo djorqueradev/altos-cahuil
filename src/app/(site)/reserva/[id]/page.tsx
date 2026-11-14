@@ -8,6 +8,7 @@ import { processOrder } from '@/lib/confirm'
 import { formatDateShort } from '@/lib/dates'
 import { formatCLP } from '@/lib/money'
 import { site } from '@/lib/site'
+import { getSettings, whatsappHref } from '@/lib/settings'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import type { Booking } from '@/lib/types'
 
@@ -36,6 +37,7 @@ export default async function BookingStatusPage(props: PageProps<'/reserva/[id]'
     booking = (await load(id))!
   }
 
+  const waHref = whatsappHref(await getSettings(), `Hola, tengo una consulta sobre mi reserva ${booking.code}`)
   const confirmed = booking.status === 'confirmed'
   const mpRejected = sp.status === 'rejected' || sp.collection_status === 'rejected'
   const returnedFromMP = !!paymentId || sp.status === 'approved' || sp.collection_status === 'approved'
@@ -93,7 +95,7 @@ export default async function BookingStatusPage(props: PageProps<'/reserva/[id]'
           ) : !waiting ? (
             <>
               <Link href={retryHref} className="fx-btn flex min-h-[52px] flex-[1_1_200px] items-center justify-center rounded-full bg-amber font-bold text-amber-ink">Intentar de nuevo</Link>
-              <a href={site.whatsappHref} target="_blank" rel="noreferrer" className="fx-ghost flex min-h-[52px] flex-[1_1_200px] items-center justify-center rounded-full border border-cream/35 font-semibold">Escríbenos por WhatsApp</a>
+              <a href={waHref} target="_blank" rel="noreferrer" className="fx-ghost flex min-h-[52px] flex-[1_1_200px] items-center justify-center rounded-full border border-cream/35 font-semibold">Escríbenos por WhatsApp</a>
             </>
           ) : null}
         </div>

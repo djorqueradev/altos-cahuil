@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CheckoutForm } from '@/components/checkout-form'
 import { IconCheck } from '@/components/icons'
-import { getCabin, isRangeFree } from '@/lib/data'
+import { getCabin, getQuote, isRangeFree } from '@/lib/data'
 import { diffDays, formatDate, isISODate, todayInChile } from '@/lib/dates'
 import { formatCLP } from '@/lib/money'
 import { site } from '@/lib/site'
@@ -25,12 +25,12 @@ export default async function CheckoutPage(props: PageProps<'/reservar'>) {
   const validDates = isISODate(llegada) && isISODate(salida) && llegada >= today && salida > llegada
   if (!validDates) redirect(`/cabanas/${cabin.slug}`)
   const nights = diffDays(llegada, salida)
-  const free = await isRangeFree(cabin.id, llegada, salida)
-  if (!free || nights < cabin.min_nights || cabin.price_per_night <= 0) {
+  const [free, q] = await Promise.all([isRangeFree(cabin.id, llegada, salida), getQuote(cabin.id, llegada, salida)])
+  if (!free || nights < q.min_nights || q.has_unpriced) {
     redirect(`/cabanas/${cabin.slug}?llegada=${llegada}&salida=${salida}&huespedes=${guests}`)
   }
-  const subtotal = cabin.price_per_night * nights
-  const total = subtotal + cabin.cleaning_fee
+  const subtotal = q.subtotal
+  const total = q.total
 
   return (
     <>
@@ -88,8 +88,8 @@ export default async function CheckoutPage(props: PageProps<'/reservar'>) {
               ))}
             </dl>
             <div className="flex flex-col gap-2.5 text-[15px] text-sub">
-              <div className="flex justify-between"><span>{formatCLP(cabin.price_per_night)} × {nights} {nights === 1 ? 'noche' : 'noches'}</span><span>{formatCLP(subtotal)}</span></div>
-              {cabin.cleaning_fee > 0 && <div className="flex justify-between"><span>Limpieza</span><span>{formatCLP(cabin.cleaning_fee)}</span></div>}
+              <div className="flex justify-between"><span>{nights} {nights === 1 ? 'noche' : 'noches'}{subtotal === cabin.price_per_night * nights ? ` × ${formatCLP(cabin.price_per_night)}` : ''}</span><span>{formatCLP(subtotal)}</span></div>
+              {q.cleaning_fee > 0 && <div className="flex justify-between"><span>Limpieza</span><span>{formatCLP(q.cleaning_fee)}</span></div>}
               <div className="flex justify-between border-t border-line pt-2.5 text-lg font-bold text-cream"><span>Total (CLP)</span><span>{formatCLP(total)}</span></div>
             </div>
           </div>
