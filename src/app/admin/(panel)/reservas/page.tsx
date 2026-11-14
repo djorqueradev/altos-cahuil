@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { DateField } from '@/components/date-picker'
 import { getAllCabinsAdmin } from '@/lib/data'
 import { formatDateShort, todayInChile } from '@/lib/dates'
 import { formatCLP } from '@/lib/money'
@@ -130,8 +131,8 @@ export default async function ReservationsPage(props: PageProps<'/admin/reservas
               {cabins.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </label>
-          <label className={labelCls}>Llegada<input type="date" name="check_in" required min={today} className={inputCls} /></label>
-          <label className={labelCls}>Salida<input type="date" name="check_out" required min={today} className={inputCls} /></label>
+          <div className={labelCls}><span aria-hidden="true">Llegada</span><DateField aria-label="Llegada" name="check_in" min={today} className={`${inputCls} flex w-full items-center`} /></div>
+          <div className={labelCls}><span aria-hidden="true">Salida</span><DateField aria-label="Salida" name="check_out" min={today} className={`${inputCls} flex w-full items-center`} /></div>
           <label className={labelCls}>Huéspedes<input type="number" name="guests" min={1} max={20} defaultValue={2} required className={inputCls} /></label>
           <label className={labelCls}>Nombre<input name="guest_first_name" required className={inputCls} /></label>
           <label className={labelCls}>Apellido<input name="guest_last_name" className={inputCls} /></label>

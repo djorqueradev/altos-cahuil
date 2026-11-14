@@ -1,4 +1,5 @@
 import { getAllCabinsAdmin } from '@/lib/data'
+import { DateField } from '@/components/date-picker'
 import { addDays, formatDateShort, todayInChile } from '@/lib/dates'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createBlock, deleteBlock } from '../../actions'
@@ -38,8 +39,8 @@ export default async function BlocksPage(props: PageProps<'/admin/bloqueos'>) {
             ))}
           </fieldset>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
-            <label className={labelCls}>Desde (primera noche)<input type="date" name="start_date" required min={today} className={inputCls} /></label>
-            <label className={labelCls}>Hasta (día de salida)<input type="date" name="end_date" required min={today} className={inputCls} /></label>
+            <div className={labelCls}><span aria-hidden="true">Desde (primera noche)</span><DateField aria-label="Desde" name="start_date" min={today} className={`${inputCls} flex w-full items-center`} /></div>
+            <div className={labelCls}><span aria-hidden="true">Hasta (día de salida)</span><DateField aria-label="Hasta" name="end_date" min={today} className={`${inputCls} flex w-full items-center`} /></div>
             <label className={labelCls}>Motivo<input name="reason" placeholder="Mantención" className={inputCls} /></label>
             <div className="flex items-end"><button type="submit" className={btn}>Bloquear</button></div>
           </div>

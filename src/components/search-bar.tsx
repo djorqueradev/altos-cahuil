@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { DatePicker } from '@/components/date-picker'
 import { addDays } from '@/lib/dates'
 
 type Props = {
@@ -36,29 +37,30 @@ export function SearchBar({ cabins, today, maxGuests, className = '' }: Props) {
       aria-label="Buscar disponibilidad"
       className={`flex max-w-[1100px] flex-wrap items-stretch rounded-[20px] border border-cream/20 bg-surface/80 p-2.5 backdrop-blur-md ${className}`}
     >
-      <label className="flex min-w-[45%] flex-1 basis-[180px] flex-col gap-1.5 border-line px-5 py-3 md:border-r">
-        <span className={labelCls}>Llegada</span>
-        <input
-          type="date"
+      <div className="flex min-w-[45%] flex-1 basis-[180px] flex-col gap-1.5 border-line px-5 py-3 md:border-r">
+        <span className={labelCls} aria-hidden="true">Llegada</span>
+        <DatePicker
+          aria-label="Llegada"
           min={today}
           value={checkIn}
-          onChange={(e) => {
-            setCheckIn(e.target.value)
-            if (!checkOut || checkOut <= e.target.value) setCheckOut(addDays(e.target.value, 2))
+          onChange={(v) => {
+            setCheckIn(v)
+            if (!checkOut || checkOut <= v) setCheckOut(addDays(v, 2))
           }}
           className={fieldCls}
         />
-      </label>
-      <label className="flex min-w-[45%] flex-1 basis-[180px] flex-col gap-1.5 border-line px-5 py-3 md:border-r">
-        <span className={labelCls}>Salida</span>
-        <input
-          type="date"
+      </div>
+      <div className="flex min-w-[45%] flex-1 basis-[180px] flex-col gap-1.5 border-line px-5 py-3 md:border-r">
+        <span className={labelCls} aria-hidden="true">Salida</span>
+        <DatePicker
+          aria-label="Salida"
           min={checkIn ? addDays(checkIn, 1) : addDays(today, 1)}
+          openTo={checkIn || undefined}
           value={checkOut}
-          onChange={(e) => setCheckOut(e.target.value)}
+          onChange={setCheckOut}
           className={fieldCls}
         />
-      </label>
+      </div>
       <label className="flex min-w-[45%] flex-1 basis-[160px] flex-col gap-1.5 border-line px-5 py-3 md:border-r">
         <span className={labelCls}>Huéspedes</span>
         <select value={guests} onChange={(e) => setGuests(e.target.value)} className={`${fieldCls} bg-surface`}>
