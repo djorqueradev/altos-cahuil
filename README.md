@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Altos de Cahuil — sitio web y reservas
 
-## Getting Started
+Sitio de las cabañas Altos de Cahuil (Cáhuil, Pichilemu): web pública, reservas con pago en **Mercado Pago**,
+sincronización de calendarios con **Booking.com** y **Airbnb** (iCal) y panel de administración.
 
-First, run the development server:
+**Stack:** Next.js 16 (App Router) · Tailwind 4 · Supabase (Postgres + Auth) · Mercado Pago Checkout Pro · Resend (correos, opcional).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Cómo funciona
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Parte | Dónde |
+| --- | --- |
+| Inicio, ficha de cabaña con calendario, reserva, confirmación | `src/app/(site)` |
+| Crear reserva + preferencia de pago | `POST /api/bookings` |
+| Confirmación del pago (webhook) | `POST /api/mercadopago/webhook` |
+| Calendario que se exporta a Booking/Airbnb | `GET /api/ical/[cabaña]?token=…&exclude=booking` |
+| Importar Booking/Airbnb + liberar pagos vencidos | `GET /api/cron/sync` (con `Authorization: Bearer CRON_SECRET`) |
+| Panel (calendario, reservas, bloqueos, tarifas, canales) | `/admin` |
+| Esquema de base de datos | `supabase/migrations/` |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Al reservar, las fechas quedan apartadas 30 min (`pending`) mientras el huésped paga. Una restricción de exclusión en Postgres
+  impide que dos reservas se crucen; antes de crear una se refrescan los calendarios de Booking/Airbnb de esa cabaña.
+- El pago se confirma por el webhook y también cuando el huésped vuelve desde Mercado Pago (lo que llegue primero).
+- Si un pago llega tarde y las fechas ya se ocuparon, la reserva queda con una **alerta** en el panel para reembolsar.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Puesta en marcha
 
-## Learn More
+1. **Supabase**: en el SQL Editor ejecuta `supabase/migrations/20261114000000_init.sql`.
+2. **Usuario administrador**: Authentication → Users → *Add user* (correo + contraseña). Luego en el SQL Editor:
+   ```sql
+   insert into public.admins (user_id) select id from auth.users where email = 'TU_CORREO';
+   ```
+3. **Variables de entorno**: copia `.env.example` a `.env.local` y complétalo.
+4. `npm install` y `npm run dev` → http://localhost:3000 (panel en `/admin`).
+5. En el panel → **Cabañas y tarifas**: pon precio por noche, limpieza, capacidad y noches mínimas.
 
-To learn more about Next.js, take a look at the following resources:
+## Publicar en Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Importa este repo en Vercel y agrega las variables de `.env.example` (con `NEXT_PUBLIC_SITE_URL` = tu dominio).
+2. **Mercado Pago** → Tus integraciones → Webhooks: URL `https://TU_DOMINIO/api/mercadopago/webhook`, evento *Pagos*.
+   Copia la clave secreta en `MP_WEBHOOK_SECRET`.
+3. **Sincronización frecuente**: `vercel.json` corre `/api/cron/sync` una vez al día (límite del plan Hobby). Para cada
+   15 minutos ejecuta `supabase/cron.sql` en Supabase (usa pg_cron) después de publicar.
+4. **Booking/Airbnb**: en el panel → *Booking / Airbnb*, pega el enlace iCal que exporta cada canal y copia nuestro enlace
+   en la opción *Importar calendario* de cada canal.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Textos por completar
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Busca `[` en `src/lib/site.ts` (horarios, política de cancelación, mascotas, distancias) y en `src/app/(site)/condiciones`.
