@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getCabin } from '@/lib/data'
 import { isISODate } from '@/lib/dates'
-import { createPreference } from '@/lib/mercadopago'
+import { createOrder } from '@/lib/mercadopago'
 import { site } from '@/lib/site'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { syncChannels } from '@/lib/sync'
@@ -71,13 +71,10 @@ export async function POST(req: Request) {
   const booking = data as Booking
 
   try {
-    const pref = await createPreference(booking, cabin.name)
-    await db.from('bookings').update({ mp_preference_id: pref.id }).eq('id', booking.id)
-    const useSandbox = process.env.MP_USE_SANDBOX === 'true'
-    return NextResponse.json({
-      bookingId: booking.id,
-      checkoutUrl: useSandbox ? pref.sandbox_init_point : pref.init_point,
-    })
+    const order = await createOrder(booking, cabin.name)
+    if (!order.checkout_url) throw new Error('Mercado Pago no devolvió checkout_url')
+    await db.from('bookings').update({ mp_order_id: order.id }).eq('id', booking.id)
+    return NextResponse.json({ bookingId: booking.id, checkoutUrl: order.checkout_url })
   } catch (e) {
     console.error(e)
     // Libera las fechas si no pudimos abrir el pago

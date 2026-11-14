@@ -56,7 +56,7 @@ create table public.bookings (
   status public.booking_status not null default 'pending',
   source public.booking_source not null default 'direct',
   expires_at timestamptz,                 -- solo para 'pending': se libera si no paga
-  mp_preference_id text,
+  mp_order_id text,                       -- id de la order de Mercado Pago (API de Orders)
   mp_payment_id text,
   paid_at timestamptz,
   admin_alert text,                       -- p.ej. pago recibido pero fechas ya tomadas

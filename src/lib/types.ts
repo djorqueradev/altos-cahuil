@@ -46,7 +46,7 @@ export type Booking = {
   status: BookingStatus
   source: BookingSource
   expires_at: string | null
-  mp_preference_id: string | null
+  mp_order_id: string | null
   mp_payment_id: string | null
   paid_at: string | null
   admin_alert: string | null

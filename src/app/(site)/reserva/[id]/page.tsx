@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AutoRefresh } from '@/components/auto-refresh'
 import { IconChat, IconCheck, IconMail } from '@/components/icons'
-import { processPayment } from '@/lib/confirm'
+import { processOrder } from '@/lib/confirm'
 import { formatDateShort } from '@/lib/dates'
 import { formatCLP } from '@/lib/money'
 import { site } from '@/lib/site'
@@ -29,10 +29,10 @@ export default async function BookingStatusPage(props: PageProps<'/reserva/[id]'
   let booking = await load(id)
   if (!booking) notFound()
 
-  // Al volver de Mercado Pago llega ?payment_id=…: confirmamos sin esperar el webhook.
+  // Al volver de Mercado Pago consultamos la order: confirmamos sin esperar el webhook.
   const paymentId = typeof sp.payment_id === 'string' ? sp.payment_id : null
-  if (booking.status !== 'confirmed' && paymentId && /^\d+$/.test(paymentId)) {
-    await processPayment(paymentId).catch((e) => console.error(e))
+  if (booking.status !== 'confirmed' && booking.mp_order_id) {
+    await processOrder(booking.mp_order_id).catch((e) => console.error(e))
     booking = (await load(id))!
   }
 
