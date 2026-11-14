@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export type Settings = {
   check_in_from: string
+  check_in_until: string
   check_out_until: string
   cancellation_policy: string
   pets_policy: string
@@ -13,10 +14,16 @@ export type Settings = {
   contact_email: string
   whatsapp: string
   instagram: string
+  notify_emails: string
+  email_reminders: boolean
+  reminder_days: number
+  email_thanks: boolean
+  email_abandoned: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   check_in_from: '',
+  check_in_until: '',
   check_out_until: '',
   cancellation_policy: '',
   pets_policy: '',
@@ -26,6 +33,11 @@ export const DEFAULT_SETTINGS: Settings = {
   contact_email: 'altos.cahuil@gmail.com',
   whatsapp: '56981975916',
   instagram: '',
+  notify_emails: '',
+  email_reminders: true,
+  reminder_days: 2,
+  email_thanks: true,
+  email_abandoned: true,
 }
 
 /** Configuración del negocio editable desde el panel (una sola fila). */

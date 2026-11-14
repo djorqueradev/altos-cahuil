@@ -28,7 +28,7 @@ export async function processOrder(orderId: string): Promise<Booking | null> {
       .from('bookings')
       .update({ mp_payment_id: paymentId, admin_alert: `Monto pagado (${paid} ${order.currency ?? ''}) no coincide con el total` })
       .eq('id', b.id)
-    await sendOwnerAlert(`Revisar pago de reserva ${b.code}`, 'El monto pagado no coincide con el total de la reserva.')
+    await sendOwnerAlert(`Revisar pago de reserva ${b.code}`, `El monto pagado en Mercado Pago (${paid} ${order.currency ?? 'CLP'}) no coincide con el total de la reserva. Revisa el pago antes de confirmar.`, b)
     return b
   }
 
@@ -53,7 +53,7 @@ export async function processOrder(orderId: string): Promise<Booking | null> {
     // Lo más probable: el pago llegó tarde y otra reserva ya tomó esas fechas.
     const alert = 'Pago aprobado pero las fechas ya están ocupadas: contactar al huésped y reembolsar.'
     await db.from('bookings').update({ mp_payment_id: paymentId, admin_alert: alert }).eq('id', b.id)
-    await sendOwnerAlert(`URGENTE: reserva ${b.code} pagada sin fechas`, alert)
+    await sendOwnerAlert(`URGENTE: reserva ${b.code} pagada sin fechas`, alert, b)
     return b
   }
   if (updated) {

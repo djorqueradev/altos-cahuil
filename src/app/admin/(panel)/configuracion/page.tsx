@@ -18,10 +18,21 @@ export default async function SettingsPage(props: PageProps<'/admin/configuracio
       <PageHeader title="Configuración" subtitle="Lo que ven los huéspedes en la web y en los correos de confirmación." />
       <Flash sp={sp} />
 
+      <Link href="/admin/configuracion/correos" className={`fx-tile ${cls.card} mb-6 flex items-center justify-between gap-4 p-5`}>
+        <span>
+          <span className="block text-[15px] font-semibold">Correos automáticos</span>
+          <span className="mt-1 block text-sm text-muted">Confirmación, recordatorio, agradecimiento y avisos para ustedes. Ver cómo se ven y elegir cuáles enviar.</span>
+        </span>
+        <span aria-hidden="true" className="text-xl text-amber">→</span>
+      </Link>
+
       <form action={saveSettingsAction} className="mb-6 flex flex-col gap-4">
         <Card title="Estadía y políticas">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className={cls.label}>Check-in desde<input name="check_in_from" defaultValue={s.check_in_from} placeholder="15:00" className={cls.input} /></label>
+            <div className="grid grid-cols-2 gap-3">
+              <label className={cls.label}>Check-in desde<input name="check_in_from" defaultValue={s.check_in_from} placeholder="14:00" className={cls.input} /></label>
+              <label className={cls.label}>Check-in hasta<input name="check_in_until" defaultValue={s.check_in_until} placeholder="20:00" className={cls.input} /></label>
+            </div>
             <label className={cls.label}>Check-out hasta<input name="check_out_until" defaultValue={s.check_out_until} placeholder="12:00" className={cls.input} /></label>
             <label className={`${cls.label} md:col-span-2`}>
               Política de cancelación

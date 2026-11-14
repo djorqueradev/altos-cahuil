@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { SiteHeader } from '@/components/site-header'
 import { getSettings, orConsult } from '@/lib/settings'
+import { checkInText, checkOutText } from '@/lib/settings-format'
 
 export const metadata: Metadata = { title: 'Condiciones de reserva' }
 
@@ -8,7 +9,7 @@ export default async function ConditionsPage() {
   const s = await getSettings()
   const items: [string, string][] = [
     ['Pago', `La reserva se confirma al pagar el total con Mercado Pago. Las fechas quedan reservadas por ${s.payment_hold_minutes} minutos mientras completas el pago.`],
-    ['Horarios', `Check-in desde las ${orConsult(s.check_in_from)}. Check-out hasta las ${orConsult(s.check_out_until)}.`],
+    ['Horarios', `Check-in: ${checkInText(s).toLowerCase() || 'consúltanos'}. Check-out: ${checkOutText(s).toLowerCase() || 'consúltanos'}.`],
     ['Cancelación', orConsult(s.cancellation_policy)],
     ['Mascotas', orConsult(s.pets_policy)],
     ...(s.house_rules.trim() ? [['Normas de la casa', s.house_rules] as [string, string]] : []),

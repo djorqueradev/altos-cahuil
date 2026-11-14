@@ -53,6 +53,7 @@ export function NewBookingForm({ prefill, onDone }: { prefill?: NewBookingPrefil
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('+56 9 ')
   const [email, setEmail] = useState('')
+  const [sendEmail, setSendEmail] = useState(true)
   const [total, setTotal] = useState('')
   const [totalTouched, setTotalTouched] = useState(false)
   const [paid, setPaid] = useState<'none' | 'partial' | 'full'>('none')
@@ -83,6 +84,7 @@ export function NewBookingForm({ prefill, onDone }: { prefill?: NewBookingPrefil
   const totalN = toInt(total)
   const amountPaid = paid === 'full' ? totalN : paid === 'partial' ? Math.min(toInt(partial), totalN) : 0
   const conflicts = q && q.ok ? q.conflicts : []
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -100,6 +102,7 @@ export function NewBookingForm({ prefill, onDone }: { prefill?: NewBookingPrefil
         lastName,
         phone: phone.trim() === '+56 9' ? '' : phone,
         email,
+        sendEmail: sendEmail && emailOk,
         total: totalN,
         amountPaid,
         paymentMethod: amountPaid > 0 ? method : '',
@@ -160,6 +163,12 @@ export function NewBookingForm({ prefill, onDone }: { prefill?: NewBookingPrefil
           <label className={cls.label}>Teléfono / WhatsApp<input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" className={cls.input} autoComplete="off" /></label>
           <label className={cls.label}>Correo (opcional)<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className={cls.input} autoComplete="off" /></label>
         </div>
+        {emailOk && (
+          <label className="flex items-center gap-3 text-sm text-sub">
+            <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} className="h-5 w-5 accent-amber" />
+            Enviarle la confirmación y el recordatorio por correo
+          </label>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">

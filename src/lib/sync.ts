@@ -1,4 +1,5 @@
 import 'server-only'
+import { sendAbandonedEmails } from '@/lib/email'
 import { addDays, todayInChile } from '@/lib/dates'
 import { parseICS } from '@/lib/ical'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -66,10 +67,13 @@ export async function syncChannels(cabinId?: string): Promise<SyncResult[]> {
 
 /** Marca como vencidas las reservas pendientes cuyo plazo de pago terminó. */
 export async function expirePendingBookings() {
-  const { error } = await supabaseAdmin()
+  const { data, error } = await supabaseAdmin()
     .from('bookings')
     .update({ status: 'expired' })
     .eq('status', 'pending')
     .lt('expires_at', new Date().toISOString())
+    .select('*, cabins(name, slug)')
   if (error) throw error
+  if (data?.length) await sendAbandonedEmails(data).catch((e) => console.error(e))
+  return data?.length ?? 0
 }

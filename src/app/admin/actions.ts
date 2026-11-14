@@ -5,7 +5,13 @@ import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { requireAdmin } from '@/lib/admin-auth'
 import { getQuote } from '@/lib/data'
-import { diffDays, isISODate } from '@/lib/dates'
+import { diffDays, isISODate, todayInChile } from '@/lib/dates'
+import { isEmail, resendConfirmation, sendBookingCancelled, sendBookingConfirmed, sendEmail } from '@/lib/email'
+import { renderTemplate, TEMPLATES, type TemplateId } from '@/lib/emails/templates'
+import { env } from '@/lib/env'
+import { getSettings } from '@/lib/settings'
+import { sampleBooking } from '@/lib/emails/sample'
+import type { Booking } from '@/lib/types'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { supabaseServer } from '@/lib/supabase/server'
 import { syncChannels } from '@/lib/sync'
@@ -73,6 +79,7 @@ const NewBooking = z.object({
   lastName: z.string().trim().default(''),
   phone: z.string().trim().default(''),
   email: z.string().trim().default(''),
+  sendEmail: z.boolean().default(false),
   total: z.number().int().min(0),
   amountPaid: z.number().int().min(0),
   paymentMethod: z.string().trim().default(''),
@@ -110,11 +117,17 @@ export async function createManualBookingAction(input: z.input<typeof NewBooking
       status: 'confirmed',
       source: 'manual',
       paid_at: m.amountPaid > 0 ? new Date().toISOString() : null,
+      send_emails: m.sendEmail && isEmail(m.email),
     })
-    .select('id, code')
+    .select('*')
     .single()
   if (error) return fail(error.message.includes('bookings_no_overlap') ? 'Esas fechas ya están ocupadas.' : error.message)
-  return done(`Reserva ${data.code} creada.`, data.id)
+  let note = ''
+  if (m.sendEmail && isEmail(m.email)) {
+    await sendBookingConfirmed(data as Booking, '').catch((e) => console.error(e))
+    note = ' Le enviamos la confirmación por correo.'
+  }
+  return done(`Reserva ${data.code} creada.${note}`, data.id)
 }
 
 const Patch = z.object({
@@ -152,11 +165,20 @@ export async function setPaymentAction(id: string, amountPaid: number, method: s
   return done(amount >= b.total ? 'Reserva marcada como pagada.' : 'Pago registrado.')
 }
 
-export async function cancelBookingAction(id: string): Promise<ActionResult> {
+export async function cancelBookingAction(id: string, notify = true): Promise<ActionResult> {
   await requireAdmin()
   const { error } = await supabaseAdmin().from('bookings').update({ status: 'cancelled', expires_at: null }).eq('id', id)
   if (error) return fail(error.message)
-  return done('Reserva cancelada: las fechas quedaron libres.')
+  const sent = notify ? await sendBookingCancelled(id).catch(() => null) : null
+  return done(`Reserva cancelada: las fechas quedaron libres.${sent?.ok ? ' Le avisamos al huésped por correo.' : ''}`)
+}
+
+export async function resendConfirmationAction(id: string): Promise<ActionResult> {
+  await requireAdmin()
+  const r = await resendConfirmation(id)
+  if (!r.ok) return fail(r.error)
+  await supabaseAdmin().from('bookings').update({ send_emails: true }).eq('id', id)
+  return done('Confirmación enviada al huésped.')
 }
 
 export async function clearAlertAction(id: string): Promise<ActionResult> {
@@ -186,7 +208,7 @@ export async function deleteBlockAction(id: string): Promise<ActionResult> {
 
 // ---------------------------------------------------------------- Formularios de configuración (con redirect)
 function back(path: string, params: Record<string, string>): never {
-  redirect(`${path}?${new URLSearchParams(params)}`)
+  redirect(`${path}${path.includes('?') ? '&' : '?'}${new URLSearchParams(params)}`)
 }
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim()
 const int = (fd: FormData, k: string) => Math.max(0, Math.round(Number(str(fd, k).replace(/[^\d]/g, '')) || 0))
@@ -252,6 +274,7 @@ export async function saveSettingsAction(fd: FormData) {
     .from('settings')
     .update({
       check_in_from: str(fd, 'check_in_from'),
+      check_in_until: str(fd, 'check_in_until'),
       check_out_until: str(fd, 'check_out_until'),
       cancellation_policy: str(fd, 'cancellation_policy'),
       pets_policy: str(fd, 'pets_policy'),
@@ -289,4 +312,43 @@ export async function saveFeedAction(fd: FormData) {
   revalidatePath('/admin', 'layout')
   if (mine && !mine.ok) back('/admin/canales', { error: `Guardado, pero no se pudo leer el calendario: ${mine.error}` })
   back('/admin/canales', { ok: `Calendario conectado (${mine?.events ?? 0} reservas importadas).` })
+}
+
+// ---------------------------------------------------------------- Correos
+export async function saveEmailSettingsAction(fd: FormData) {
+  await requireAdmin()
+  const notify = str(fd, 'notify_emails')
+    .split(/[,;\s]+/)
+    .filter(Boolean)
+  const bad = notify.find((x) => !isEmail(x))
+  if (bad) back('/admin/configuracion/correos', { error: `"${bad}" no parece un correo válido.` })
+  const days = Math.min(7, Math.max(1, int(fd, 'reminder_days') || 2))
+  const { error } = await supabaseAdmin()
+    .from('settings')
+    .update({
+      notify_emails: notify.join(', '),
+      email_reminders: fd.get('email_reminders') === 'on',
+      reminder_days: days,
+      email_thanks: fd.get('email_thanks') === 'on',
+      email_abandoned: fd.get('email_abandoned') === 'on',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', 1)
+  if (error) back('/admin/configuracion/correos', { error: error.message })
+  revalidatePath('/admin', 'layout')
+  back('/admin/configuracion/correos', { ok: 'Correos automáticos guardados.' })
+}
+
+export async function sendTestEmailAction(fd: FormData) {
+  const user = await requireAdmin()
+  const id = str(fd, 'template') as TemplateId
+  if (!TEMPLATES.some((t) => t.id === id)) back('/admin/configuracion/correos', { error: 'Plantilla inválida' })
+  const to = user.email ?? ''
+  const settings = await getSettings()
+  const { booking, cabin } = await sampleBooking()
+  const today = todayInChile()
+  const email = renderTemplate(id, { siteUrl: env.siteUrl(), settings, booking, cabin }, today)
+  const r = await sendEmail(to, { ...email, subject: `[Prueba] ${email.subject}` }, { tag: 'prueba' })
+  if (!r.ok) back(`/admin/configuracion/correos?ver=${id}`, { error: `No se pudo enviar: ${r.error}` })
+  back(`/admin/configuracion/correos?ver=${id}`, { ok: `Prueba enviada a ${to}. Revisa tu bandeja (y spam).` })
 }

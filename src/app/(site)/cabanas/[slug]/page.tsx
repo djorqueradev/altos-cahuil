@@ -9,6 +9,7 @@ import { SiteHeader } from '@/components/site-header'
 import { getBusyRanges, getCabin, getRates } from '@/lib/data'
 import { addMonths, isISODate, todayInChile } from '@/lib/dates'
 import { getSettings, orConsult } from '@/lib/settings'
+import { checkInText } from '@/lib/settings-format'
 
 export const dynamic = 'force-dynamic'
 
@@ -110,7 +111,7 @@ export default async function CabinPage(props: PageProps<'/cabanas/[slug]'>) {
                 <h2 className="mb-5 font-display text-[42px] font-medium">Bueno saber</h2>
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-4">
                   {[
-                    ['Check-in', settings.check_in_from ? `Desde las ${settings.check_in_from}` : 'Consúltanos'],
+                    ['Check-in', checkInText(settings) || 'Consúltanos'],
                     ['Check-out', settings.check_out_until ? `Hasta las ${settings.check_out_until}` : 'Consúltanos'],
                     ['Cancelación', orConsult(settings.cancellation_policy)],
                     ['Mascotas', orConsult(settings.pets_policy)],

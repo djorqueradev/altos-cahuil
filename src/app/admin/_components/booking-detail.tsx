@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { IconCalendar, IconChat, IconMail } from '@/components/icons'
 import { formatDate } from '@/lib/dates'
 import { formatCLP } from '@/lib/money'
-import { cancelBookingAction, clearAlertAction, setPaymentAction, updateBookingAction } from '../actions'
+import { cancelBookingAction, clearAlertAction, resendConfirmationAction, setPaymentAction, updateBookingAction } from '../actions'
 import { useAdmin } from './admin-provider'
 import { Drawer } from './drawer'
 import { Segmented } from './new-booking-form'
@@ -44,6 +44,7 @@ export function BookingDetail({ booking: b, onClose }: { booking: AdminBooking; 
   const name = `${b.guest_first_name} ${clean(b.guest_last_name)}`.trim()
   const phone = clean(b.guest_phone)
   const email = clean(b.guest_email)
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   const wa = phone ? waLink(phone, `Hola ${b.guest_first_name}, te escribimos de Altos de Cahuil por tu reserva ${b.code} (${formatDate(b.check_in)} → ${formatDate(b.check_out)}).`) : null
 
   async function act<T extends { ok: boolean }>(fn: () => Promise<T>, closeAfter = false) {
@@ -98,6 +99,18 @@ export function BookingDetail({ booking: b, onClose }: { booking: AdminBooking; 
             {!wa && !phone && !email && <p className="text-sm text-muted">Sin datos de contacto.</p>}
           </div>
           {b.guest_document && <p className="text-xs text-muted">RUT / pasaporte: {b.guest_document}</p>}
+          {b.status === 'confirmed' && validEmail && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm(`¿Enviar el correo de confirmación a ${email}?`)) act(() => resendConfirmationAction(b.id))
+              }}
+              className={`${cls.ghostSm} self-start`}
+            >
+              <IconMail size={14} /> {b.source === 'manual' ? 'Enviar confirmación por correo' : 'Reenviar confirmación por correo'}
+            </button>
+          )}
         </section>
 
         {/* Pago */}
@@ -199,7 +212,7 @@ export function BookingDetail({ booking: b, onClose }: { booking: AdminBooking; 
               type="button"
               disabled={busy}
               onClick={() => {
-                if (window.confirm(`¿Cancelar la reserva ${b.code} de ${name}? Las fechas quedarán libres.${b.amount_paid ? ' Recuerda devolver el dinero si corresponde.' : ''}`)) act(() => cancelBookingAction(b.id), true)
+                if (window.confirm(`¿Cancelar la reserva ${b.code} de ${name}? Las fechas quedarán libres.${validEmail ? ` Le avisaremos por correo a ${email}.` : ''}${b.amount_paid ? ' Recuerda devolver el dinero si corresponde.' : ''}`)) act(() => cancelBookingAction(b.id), true)
               }}
               className={cls.danger}
             >

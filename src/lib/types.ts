@@ -53,6 +53,9 @@ export type Booking = {
   amount_paid: number
   payment_method: string | null
   internal_notes: string | null
+  send_emails?: boolean
+  reminder_sent_at?: string | null
+  thanks_sent_at?: string | null
   created_at: string
 }
 

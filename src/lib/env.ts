@@ -15,6 +15,6 @@ export const env = {
   mpWebhookSecret: () => process.env.MP_WEBHOOK_SECRET || '',
   cronSecret: () => process.env.CRON_SECRET || '',
   resendApiKey: () => process.env.RESEND_API_KEY || '',
-  emailFrom: () => process.env.EMAIL_FROM || 'Altos de Cahuil <reservas@altosdecahuil.cl>',
+  emailFrom: () => process.env.EMAIL_FROM || 'Altos de Cahuil <reservas@altosdecahuil.com>',
   ownerEmail: () => process.env.OWNER_EMAIL || '',
 }

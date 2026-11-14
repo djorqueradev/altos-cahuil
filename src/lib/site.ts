@@ -22,6 +22,12 @@ export const site = {
     { name: 'Laguna de Cáhuil', distance: '[distancia]' },
     { name: 'Centro de Pichilemu', distance: '[distancia]' },
   ],
+  // Datos prácticos que aparecen en el correo de recordatorio (tomados de las publicaciones en Airbnb/Booking).
+  stayTips: [
+    { title: 'Estacionamiento', text: 'Gratis, dentro del terreno.' },
+    { title: 'Playa', text: 'La playa La Pancora está a unos 5 minutos caminando.' },
+    { title: 'Parrilla', text: 'Hay parrilla y mesa para comer al aire libre en el patio.' },
+  ],
   timeZone: 'America/Santiago',
   // Minutos que se reservan las fechas mientras el huésped paga en Mercado Pago
   paymentHoldMinutes: 30,
