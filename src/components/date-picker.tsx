@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { IconChevronLeft, IconChevronRight } from '@/components/icons'
 import { addDays, addMonths, daysInMonth, formatDateFull, formatMonth, startOfMonth, weekdayMondayFirst } from '@/lib/dates'
 
@@ -30,16 +31,19 @@ type Props = {
 export function DatePicker({ value, onChange, min, name, placeholder = 'dd/mm/aaaa', className = '', openTo, ...rest }: Props) {
   const [open, setOpen] = useState(false)
   const [month, setMonth] = useState(() => startOfMonth(value || openTo || min || new Date().toISOString().slice(0, 10)))
-  const [placement, setPlacement] = useState<{ up: boolean; right: boolean }>({ up: false, right: false })
+  const [pos, setPos] = useState<CSSProperties>({})
   const wrap = useRef<HTMLDivElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
   const btn = useRef<HTMLButtonElement>(null)
   const popId = useId()
 
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {
-      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      if (!wrap.current?.contains(t) && !pop.current?.contains(t)) setOpen(false)
     }
+    const onMove = () => place()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpen(false)
@@ -48,21 +52,31 @@ export function DatePicker({ value, onChange, min, name, placeholder = 'dd/mm/aa
     }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
     return () => {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
     }
   }, [open])
 
+  /** Calcula dónde flota el calendario (fijo a la ventana, para que ningún contenedor lo recorte). */
+  function place() {
+    const r = btn.current?.getBoundingClientRect()
+    if (!r) return
+    const W = Math.min(300, window.innerWidth - 32)
+    const H = 370
+    const left = Math.max(16, Math.min(r.left, window.innerWidth - W - 16))
+    const below = window.innerHeight - r.bottom
+    const up = below < H + 16 && r.top > below
+    setPos(up ? { left, width: W, bottom: window.innerHeight - r.top + 10 } : { left, width: W, top: r.bottom + 10 })
+  }
+
   function toggle() {
     if (!open) {
-      const r = btn.current?.getBoundingClientRect()
-      if (r) {
-        setPlacement({
-          up: window.innerHeight - r.bottom < 380 && r.top > 380,
-          right: r.left + 320 > window.innerWidth - 8,
-        })
-      }
+      place()
       setMonth(startOfMonth(value || openTo || min || new Date().toISOString().slice(0, 10)))
     }
     setOpen((o) => !o)
@@ -94,15 +108,14 @@ export function DatePicker({ value, onChange, min, name, placeholder = 'dd/mm/aa
         {value ? toDMY(value) : placeholder}
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
+          ref={pop}
           id={popId}
           role="dialog"
           aria-label="Elegir fecha"
-          className={`fx-up absolute z-50 w-[300px] max-w-[calc(100vw-32px)] rounded-2xl border border-cream/15 bg-surface p-4 shadow-[0_24px_60px_rgba(0,0,0,.55)] ${
-            placement.up ? 'bottom-full mb-3' : 'top-full mt-3'
-          } ${placement.right ? 'right-0' : 'left-0'}`}
-          style={{ animationDuration: '.35s' }}
+          className="fx-up fixed z-[60] rounded-2xl border border-cream/15 bg-surface p-4 font-sans text-cream shadow-[0_24px_60px_rgba(0,0,0,.55)]"
+          style={{ ...pos, animationDuration: '.35s' }}
         >
           <div className="mb-3 flex items-center justify-between">
             <button
@@ -150,7 +163,8 @@ export function DatePicker({ value, onChange, min, name, placeholder = 'dd/mm/aa
               )
             })}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
